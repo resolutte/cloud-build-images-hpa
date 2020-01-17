@@ -1,9 +1,39 @@
 steps:
 
-- id: "Building image from Dockerfile HPA"
-  name: 'gcr.io/cloud-builders/docker'
-  args: ['build','-t','gcr.io/$PROJECT_ID/php-apache-hpa:latest','-f','php-apache-hpa/Dockerfile','.']
+# Decrypt Password
+- name: "gcr.io/cloud-builders/gcloud"
+  args:
+    - "kms"
+    - "decrypt"
+    - "--ciphertext-file=secrets.enc"
+    - "--plaintext-file=secrets.env"
+    - "--location=global"
+    - "--keyring=Resolutte"
+    - "--key=docker-hub"
 
-- id: "Pushing image HPA"
-  name: 'gcr.io/cloud-builders/docker'
-  args: ['push','gcr.io/$PROJECT_ID/php-apache-hpa:latest']
+# Login to provide credentials for the push.
+- name: "gcr.io/cloud-builders/docker"
+  entrypoint: 'bash'
+  args: ['-c','cat secrets.env | docker login --username resolutte --password-stdin']
+
+  # Build the image.
+- name: 'gcr.io/cloud-builders/docker'
+  args:
+    - 'build'
+    - '--build-arg'
+    - 'version=${_IMAGE_VERSION_1}'
+    - '-t'
+    - 'resolutte/php-apache-hpa:latest'
+    - '-t'
+    - 'resolutte/php-apache-hpa:${_IMAGE_VERSION_1}'
+    - '-f'
+    - 'php-apache-hpa/Dockerfile'
+    - '.'
+
+substitutions:
+  _IMAGE_VERSION_1: '1.0.0'
+
+# Push the image to Dockerhub.
+images:
+  - 'resolutte/php-apache-hpa:latest'
+  - 'resolutte/php-apache-hpa:${_IMAGE_VERSION_1}'
